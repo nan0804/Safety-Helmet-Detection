@@ -1,0 +1,14 @@
+ultralytics==8.0.196
+opencv-python==4.8.1.78
+deepface==0.0.79
+flask==3.0.0
+flask-socketio==5.3.6
+flask-cors==4.0.0
+sqlalchemy==2.0.23
+pillow==10.1.0
+numpy==1.24.4
+python-dotenv==1.0.0
+eventlet==0.33.3
+tensorflow==2.15.0
+tf-keras==2.15.0
+requests==2.31.0

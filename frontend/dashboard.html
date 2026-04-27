@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Construction Safety Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0d1117; --card:#161b22; --border:#30363d;
+    --red:#ff4444; --green:#00cc66; --blue:#58a6ff;
+    --text:#e6edf3; --text2:#8b949e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh}
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px;
+         display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  header h1{font-size:18px;font-weight:700;color:var(--blue)}
+  .hright{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text2)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px}
+  .dot.off{background:var(--red)}
+  nav{display:flex;gap:4px;padding:12px 24px;background:var(--card);border-bottom:1px solid var(--border)}
+  .tab{padding:7px 18px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text2);border:none;background:none}
+  .tab.active{background:#21262d;color:var(--text)}
+  .page{display:none;padding:24px}
+  .page.active{display:block}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px}
+  .card-label{font-size:12px;color:var(--text2);margin-bottom:8px}
+  .card-value{font-size:28px;font-weight:700}
+  .card-value.red{color:var(--red)}
+  .card-value.green{color:var(--green)}
+  .card-value.blue{color:var(--blue)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .box h3{font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text2)}
+  .cam-wrap{background:#000;border-radius:8px;overflow:hidden;aspect-ratio:16/9;position:relative}
+  .cam-wrap img{width:100%;height:100%;object-fit:cover}
+  .vrow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+  .vrow:last-child{border:none}
+  .vname{font-size:14px;font-weight:600}
+  .vtag{font-size:11px;padding:3px 8px;border-radius:20px;background:#3d1a1a;color:var(--red)}
+  .vtime{font-size:12px;color:var(--text2)}
+  #toasts{position:fixed;top:74px;right:18px;z-index:999;display:flex;flex-direction:column;gap:8px}
+  .toast{background:#1a0a0a;border:1px solid var(--red);border-radius:8px;
+         padding:12px 16px;min-width:260px;animation:slideIn .3s ease;box-shadow:0 4px 20px rgba(255,68,68,.3)}
+  @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  .toast-title{font-weight:700;color:var(--red);font-size:13px}
+  .toast-body{font-size:12px;color:var(--text2);margin-top:3px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:10px 12px;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border)}
+  td{padding:10px 12px;border-bottom:1px solid #21262d}
+  tr:hover td{background:#21262d}
+  .badge{padding:3px 8px;border-radius:12px;font-size:11px}
+  .badge.open{background:#3d1a1a;color:var(--red)}
+  .badge.resolved{background:#0d2a1a;color:var(--green)}
+  .btn{padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600}
+  .btn-red{background:var(--red);color:#fff}
+  .btn-green{background:var(--green);color:#000}
+  .btn-blue{background:var(--blue);color:#000}
+  .btn-outline{background:none;border:1px solid var(--border);color:var(--text)}
+  .pagination{display:flex;gap:8px;align-items:center;margin-top:16px;justify-content:flex-end;font-size:13px}
+  input,select{background:#21262d;border:1px solid var(--border);color:var(--text);
+               padding:8px 12px;border-radius:6px;font-size:13px}
+  .filter-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px}
+  .modal h2{margin-bottom:16px;font-size:16px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px}
+  .field input{width:100%}
+  .modal-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+  .worker-card{background:#21262d;border-radius:8px;padding:14px;display:flex;align-items:center;gap:12px}
+  .worker-avatar{width:44px;height:44px;border-radius:50%;background:var(--blue);
+                 display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#000}
+  .alert-banner{background:#3d1a1a;border:1px solid var(--red);border-radius:8px;
+                padding:12px 16px;margin-bottom:16px;display:none;align-items:center;gap:10px}
+  .alert-banner.show{display:flex}
+  @media(max-width:768px){.grid2{grid-template-columns:1fr}.cards{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🦺 Construction Safety Monitor</h1>
+  <div class="hright">
+    <span id="clock"></span>
+    <span><span class="dot" id="sdot"></span><span id="stxt">Connecting...</span></span>
+  </div>
+</header>
+
+<nav>
+  <button class="tab active" id="tab-dashboard" onclick="goPage('dashboard',this)">📊 Dashboard</button>
+  <button class="tab" id="tab-violations" onclick="goPage('violations',this)">🚨 Violations</button>
+  <button class="tab" id="tab-workers" onclick="goPage('workers',this)">👷 Workers</button>
+  <button class="tab" id="tab-reports" onclick="goPage('reports',this)">📈 Reports</button>
+</nav>
+
+<div id="toasts"></div>
+
+<!-- DASHBOARD PAGE -->
+<div id="page-dashboard" class="page active">
+  <div id="alert-banner" class="alert-banner">
+    <span style="font-size:20px">🚨</span>
+    <div>
+      <div style="font-weight:700;color:var(--red)" id="banner-title">Violation Detected!</div>
+      <div style="font-size:12px;color:var(--text2)" id="banner-body"></div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Today's Violations</div>
+      <div class="card-value red" id="s-today">0</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Violations</div>
+      <div class="card-value blue" id="s-total">0</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Workers Involved Today</div>
+      <div class="card-value" id="s-unique">0</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Registered Workers</div>
+      <div class="card-value green" id="s-workers">0</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Active Cameras</div>
+      <div class="card-value" id="s-cams">0</div>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-bottom:16px">
+    <div class="box">
+      <h3>📷 Live Camera Feed</h3>
+      <div id="cam-feeds"></div>
+    </div>
+    <div class="box">
+      <h3>🚨 Recent Violations</h3>
+      <div id="recent-list"><div style="color:var(--text2);font-size:13px">No violations yet</div></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <h3>📊 Hourly Violations (Last 24 Hours)</h3>
+    <canvas id="hourlyChart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- VIOLATIONS PAGE -->
+<div id="page-violations" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="font-size:18px">All Violations</h2>
+  </div>
+  <div class="filter-row">
+    <input id="f-name" placeholder="Search by name..." oninput="loadV()">
+    <select id="f-resolved" onchange="loadV()">
+      <option value="">All Status</option>
+      <option value="false">Open</option>
+      <option value="true">Resolved</option>
+    </select>
+  </div>
+  <div class="box" style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Worker</th><th>Camera</th>
+        <th>Confidence</th><th>Time</th><th>Status</th><th>Action</th>
+      </tr></thead>
+      <tbody id="v-body"></tbody>
+    </table>
+    <div class="pagination">
+      <button class="btn btn-outline" onclick="vPage--; loadV()">‹ Prev</button>
+      <span id="v-pinfo">Page 1</span>
+      <button class="btn btn-outline" onclick="vPage++; loadV()">Next ›</button>
+    </div>
+  </div>
+</div>
+
+<!-- WORKERS PAGE -->
+<div id="page-workers" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="font-size:18px">Worker Registry</h2>
+    <button class="btn btn-green" onclick="showModal()">+ Register Worker</button>
+  </div>
+  <div id="worker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
+</div>
+
+<!-- REPORTS PAGE -->
+<div id="page-reports" class="page">
+  <div class="grid2">
+    <div class="box">
+      <h3>📅 Daily Violations (Last 30 Days)</h3>
+      <canvas id="dailyChart" height="120"></canvas>
+    </div>
+    <div class="box">
+      <h3>🏆 Top Violators (Last 7 Days)</h3>
+      <div id="top-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER MODAL -->
+<div id="modal" class="modal-overlay">
+  <div class="modal">
+    <h2>Register Worker</h2>
+    <div class="field"><label>Worker ID *</label><input id="m-id" placeholder="e.g. W001"></div>
+    <div class="field"><label>Full Name *</label><input id="m-name" placeholder="e.g. Rajan Kumar"></div>
+    <div class="field"><label>Designation</label><input id="m-des" placeholder="e.g. Mason"></div>
+    <div class="field"><label>Department</label><input id="m-dept" placeholder="e.g. Civil"></div>
+    <div class="field"><label>Phone</label><input id="m-phone" placeholder="e.g. 9876543210"></div>
+    <div class="field"><label>Face Photo</label><input type="file" id="m-face" accept="image/*"></div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-green" onclick="registerWorker()">Register</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API     = 'http://localhost:5000/api';
+let curPage   = 'dashboard';
+let vPage     = 1;
+let hChart, dChart;
+
+// =============================================================================
+// PERSISTENT POLLING — NO SOCKET DEPENDENCY
+// This is the key fix: polls DB every 3 seconds to check for new violations
+// Works forever — never stops, never disconnects
+// =============================================================================
+let lastViolationId = 0;
+let _ac = null;
+
+// Create audio context once and reuse forever
+function getAudio() {
+  try {
+    if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (_ac.state === 'suspended') _ac.resume();
+    return _ac;
+  } catch(e) { return null; }
+}
+
+// Unlock audio on first user click
+document.addEventListener('click', getAudio);
+
+function beep() {
+  try {
+    const ac = getAudio();
+    if (!ac) return;
+    // Two-tone beep alert
+    [880, 660].forEach((freq, i) => {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.connect(g);
+      g.connect(ac.destination);
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.4, ac.currentTime + i * 0.2);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.2 + 0.18);
+      o.start(ac.currentTime + i * 0.2);
+      o.stop(ac.currentTime + i * 0.2 + 0.2);
+    });
+  } catch(e) {}
+}
+
+// Poll for new violations every 3 seconds — ALWAYS works no matter what
+async function checkNewViolations() {
+  try {
+    const data = await api('/violations/recent');
+    if (!data || !data.length) return;
+
+    const latestId = data[0].id;
+
+    // ALWAYS reload recent list — catches Unknown->Name updates from face recognition
+    loadRecent();
+    if (curPage === 'violations') loadV();
+
+    if (lastViolationId === 0) {
+      // First load — set baseline, don't alert for old violations
+      lastViolationId = latestId;
+      return;
+    }
+
+    if (latestId > lastViolationId) {
+      // New violations found!
+      const newOnes = data.filter(v => v.id > lastViolationId);
+      lastViolationId = latestId;
+
+      newOnes.forEach(v => {
+        // Show toast notification — use updated name after delay
+        setTimeout(async () => {
+          const fresh = await api('/violations/recent');
+          const updated = fresh.find(x => x.id === v.id);
+          const name = (updated && updated.worker_name !== 'Unknown') ? updated.worker_name : v.worker_name;
+          toast(`🚨 ${name}`, `Camera: ${v.camera_id} · ${fmtTime(v.timestamp)}`);
+          beep();
+          showBanner(name, v.camera_id, v.timestamp);
+        }, 8000); // wait 8s for face recognition to complete
+      });
+
+      loadStats();
+    }
+  } catch(e) {
+    console.log('Poll error (will retry):', e);
+  }
+}
+
+function showBanner(name, cam, ts) {
+  const b = document.getElementById('alert-banner');
+  document.getElementById('banner-title').textContent = `🚨 Violation: ${name}`;
+  document.getElementById('banner-body').textContent  = `Camera: ${cam} · ${fmtTime(ts)}`;
+  b.classList.add('show');
+  setTimeout(() => b.classList.remove('show'), 8000);
+}
+
+// Start polling immediately and repeat every 3 seconds FOREVER
+setInterval(checkNewViolations, 3000);
+
+// Status indicator — always online since we use polling not socket
+function setStatus(on) {
+  document.getElementById('sdot').className = 'dot' + (on ? '' : ' off');
+  document.getElementById('stxt').textContent = on ? 'System Online' : 'Reconnecting...';
+}
+setStatus(true);
+
+// =============================================================================
+// NAVIGATION
+// =============================================================================
+function goPage(p, tabEl) {
+  curPage = p;
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  if (tabEl) tabEl.classList.add('active');
+  if (p === 'dashboard')  { loadStats(); loadRecent(); loadHourly(); loadCams(); }
+  if (p === 'violations') { vPage = 1; loadV(); }
+  if (p === 'workers')    { loadWorkers(); }
+  if (p === 'reports')    { loadDaily(); loadTop(); }
+}
+
+// =============================================================================
+// LOAD FUNCTIONS
+// =============================================================================
+async function loadStats() {
+  try {
+    const d = await api('/stats');
+    document.getElementById('s-today').textContent   = d.today_violations || 0;
+    document.getElementById('s-total').textContent   = d.total_violations || 0;
+    document.getElementById('s-unique').textContent  = d.unique_today || 0;
+    document.getElementById('s-workers').textContent = d.registered_workers || 0;
+    document.getElementById('s-cams').textContent    = d.active_cameras || 0;
+    loadCams(d.camera_ids);
+  } catch(e) {}
+}
+
+async function loadRecent() {
+  try {
+    const data = await api('/violations/recent');
+    const el   = document.getElementById('recent-list');
+    if (!data.length) {
+      el.innerHTML = '<div style="color:var(--text2);font-size:13px">No violations yet</div>';
+      return;
+    }
+    el.innerHTML = data.map(v => `
+      <div class="vrow">
+        <div>
+          <div class="vname">${v.worker_name}</div>
+          <div class="vtime">${v.camera_id} · ${fmtDT(v.timestamp)}</div>
+        </div>
+        <span class="vtag">No Helmet</span>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function loadCams(ids) {
+  const el = document.getElementById('cam-feeds');
+  const camIds = ids || ['cam_0'];
+  el.innerHTML = camIds.map(id => `
+    <div style="margin-bottom:10px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">${id.toUpperCase()}</div>
+      <div class="cam-wrap">
+        <img src="${API.replace('/api','')}/api/stream/${id}"
+             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22640%22 height=%22360%22><rect fill=%22%23000%22 width=%22640%22 height=%22360%22/><text fill=%22%23666%22 font-size=%2220%22 x=%22280%22 y=%22185%22>No Feed</text></svg>'">
+      </div>
+    </div>`).join('');
+}
+
+async function loadHourly() {
+  try {
+    const d    = await api('/stats');
+    const hrs  = Array.from({length:24}, (_,i) => String(i).padStart(2,'0'));
+    const map  = {};
+    (d.hourly||[]).forEach(h => { map[String(h.hour).padStart(2,'0')] = h.count; });
+    const vals = hrs.map(h => map[h] || 0);
+    const ctx  = document.getElementById('hourlyChart').getContext('2d');
+    if (hChart) hChart.destroy();
+    hChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: hrs,
+        datasets: [{
+          label: 'Violations',
+          data: vals,
+          backgroundColor: 'rgba(255,68,68,0.6)',
+          borderColor: '#ff4444',
+          borderWidth: 1,
+          borderRadius: 3,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+          y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true }
+        }
+      }
+    });
+  } catch(e) {}
+}
+
+let vTotalPages = 1;
+async function loadV() {
+  try {
+    const name     = document.getElementById('f-name').value;
+    const resolved = document.getElementById('f-resolved').value;
+    if (vPage < 1) vPage = 1;
+    if (vPage > vTotalPages) vPage = vTotalPages;
+    const d = await api(`/violations?page=${vPage}&per_page=20&name=${name}&resolved=${resolved}`);
+    vTotalPages = d.pages || 1;
+    document.getElementById('v-pinfo').textContent = `Page ${vPage} of ${vTotalPages}`;
+    document.getElementById('v-body').innerHTML = (d.violations || []).map(v => `
+      <tr>
+        <td>${v.id}</td>
+        <td><strong>${v.worker_name}</strong></td>
+        <td>${v.camera_id}</td>
+        <td>${v.confidence}%</td>
+        <td>${fmtDT(v.timestamp)}</td>
+        <td><span class="badge ${v.is_resolved ? 'resolved' : 'open'}">${v.is_resolved ? 'Resolved' : 'Open'}</span></td>
+        <td>
+          ${!v.is_resolved ? `<button class="btn btn-green" style="padding:4px 10px;font-size:11px"
+            onclick="resolve(${v.id})">Resolve</button>` : ''}
+        </td>
+      </tr>`).join('') || '<tr><td colspan="7" style="color:var(--text2);text-align:center">No violations found</td></tr>';
+  } catch(e) {}
+}
+
+async function resolve(id) {
+  try {
+    await fetch(`${API}/violations/${id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({is_resolved: true})
+    });
+    loadV();
+  } catch(e) {}
+}
+
+async function loadWorkers() {
+  const el = document.getElementById('worker-grid');
+  el.innerHTML = '<div style="color:var(--text2)">Loading...</div>';
+  try {
+    const ws = await api('/workers');
+    console.log('Workers loaded:', ws);
+    if (!ws || ws.length === 0) {
+      el.innerHTML = '<div style="color:var(--text2);padding:20px">No workers registered yet.<br>Click + Register Worker to add one.</div>';
+      return;
+    }
+    el.innerHTML = ws.map(w => `
+      <div class="worker-card">
+        <div class="worker-avatar">${w.name[0].toUpperCase()}</div>
+        <div style="flex:1">
+          <div style="font-weight:600">${w.name}</div>
+          <div style="font-size:12px;color:var(--text2)">${w.designation||''} · ${w.department||''}</div>
+          <div style="font-size:11px;color:var(--text2)">ID: ${w.worker_id}</div>
+        </div>
+        <button class="btn btn-outline" style="padding:4px 8px;font-size:11px"
+          onclick="removeWorker('${w.worker_id}')">Remove</button>
+      </div>`).join('');
+  } catch(e) {
+    console.error('loadWorkers error:', e);
+    el.innerHTML = '<div style="color:var(--red)">Error loading workers: ' + e + '</div>';
+  }
+}
+
+async function removeWorker(wid) {
+  if (!confirm('Remove this worker?')) return;
+  try {
+    await fetch(`${API}/workers/${wid}`, {method: 'DELETE'});
+    loadWorkers();
+  } catch(e) {}
+}
+
+async function loadDaily() {
+  try {
+    const rows = await api('/reports/daily');
+    const ctx  = document.getElementById('dailyChart').getContext('2d');
+    if (dChart) dChart.destroy();
+    dChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: rows.map(r => r.date),
+        datasets: [{
+          label: 'Violations',
+          data: rows.map(r => r.count),
+          borderColor: '#ff4444',
+          backgroundColor: 'rgba(255,68,68,0.1)',
+          fill: true,
+          tension: 0.4,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+          y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, beginAtZero: true }
+        }
+      }
+    });
+  } catch(e) {}
+}
+
+async function loadTop() {
+  try {
+    const rows = await api('/reports/top-violators');
+    document.getElementById('top-list').innerHTML = rows.length
+      ? rows.map((r,i) => `
+          <div class="vrow">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="color:var(--text2);font-size:13px">#${i+1}</span>
+              <strong>${r.name}</strong>
+            </div>
+            <span class="vtag">${r.count} violations</span>
+          </div>`).join('')
+      : '<div style="color:var(--text2);font-size:13px">No data yet</div>';
+  } catch(e) {}
+}
+
+// =============================================================================
+// MODAL
+// =============================================================================
+function showModal() { document.getElementById('modal').classList.add('open'); }
+function hideModal() { document.getElementById('modal').classList.remove('open'); }
+
+async function registerWorker() {
+  const wid  = document.getElementById('m-id').value.trim();
+  const name = document.getElementById('m-name').value.trim();
+  const f    = document.getElementById('m-face').files[0];
+
+  if (!wid || !name) {
+    alert('Worker ID and Name are required!');
+    return;
+  }
+  if (!f) {
+    alert('Please select a face photo!');
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('worker_id',   wid);
+  fd.append('name',        name);
+  fd.append('designation', document.getElementById('m-des').value);
+  fd.append('department',  document.getElementById('m-dept').value);
+  fd.append('phone',       document.getElementById('m-phone').value);
+  fd.append('face_image',  f);
+
+  // Show loading on button
+  const btn = document.querySelector('#modal .btn-green');
+  const origText = btn.textContent;
+  btn.textContent = 'Registering...';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch(`${API}/workers`, {method: 'POST', body: fd});
+    const d = await r.json();
+    console.log('Response:', d);
+
+    btn.textContent = origText;
+    btn.disabled = false;
+
+    if (r.ok) {
+      // Success!
+      hideModal();
+      alert('✅ ' + name + ' registered successfully!');
+      // Clear form
+      ['m-id','m-name','m-des','m-dept','m-phone'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('m-face').value = '';
+      // Refresh workers list and stats
+      loadWorkers();
+      loadStats();
+    } else {
+      alert('❌ Registration Failed:\n' + d.error);
+    }
+  } catch(e) {
+    btn.textContent = origText;
+    btn.disabled = false;
+    alert('❌ Error connecting to server:\n' + e);
+    console.error(e);
+  }
+}
+
+// =============================================================================
+// TOAST — no audio here, beep() is called separately
+// =============================================================================
+function toast(title, body) {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<div class="toast-title">${title}</div>
+                 <div class="toast-body">${body}</div>`;
+  c.appendChild(t);
+  setTimeout(() => { if (t.parentNode) t.remove(); }, 6000);
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+async function api(path) {
+  const r = await fetch(API + path);
+  return r.json();
+}
+function fmtTime(ts) { return ts ? new Date(ts).toLocaleTimeString() : '-'; }
+function fmtDT(ts)   { return ts ? new Date(ts).toLocaleString() : '-'; }
+
+// =============================================================================
+// CLOCK
+// =============================================================================
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleString();
+}, 1000);
+
+// =============================================================================
+// BACKGROUND REFRESH — stats and recent every 4 seconds
+// =============================================================================
+setInterval(async () => {
+  try { await loadStats();  } catch(e) {}
+  try { await loadRecent(); } catch(e) {}
+  if (curPage === 'violations') { try { await loadV(); } catch(e) {} }
+}, 2000);
+
+// =============================================================================
+// INIT
+// =============================================================================
+loadStats();
+loadRecent();
+loadHourly();
+loadCams();
+</script>
+</body>
+</html>
